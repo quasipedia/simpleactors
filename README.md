@@ -1,4 +1,4 @@
-asynctor
-========
+Simple Actors
+=============
 
-An experiment with asyncio and the actor model
+An extremely simple implementation of the Actor model

@@ -28,6 +28,8 @@ def on(message):
 
 class Actor:
 
+    '''An actor that reacts to events.'''
+
     def __init__(self):
         global_actors.append(self)
         self._extract_from_decorated()
