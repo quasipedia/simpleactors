@@ -41,10 +41,6 @@ class Actor:
                 for message in method._callback_messages:
                     global_callbacks[message].append(method)
 
-    @on('foo.bar.baz')
-    def foo(self, message, emitter, *args, **kwargs):
-        print(message, emitter, args, kwargs)
-
     def emit(self, message, *args, **kwargs):
         '''Emit an event.'''
         global_event_queue.append((message, self, args, kwargs))
