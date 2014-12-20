@@ -29,9 +29,9 @@ class BaseTest(unittest.TestCase):
     '''Base class for all tests of simpleactors.'''
 
     def tearDown(self):
-        sa.global_actors = []
+        sa.global_actors = set()
         sa.global_event_queue = deque()
-        sa.global_callbacks = defaultdict(list)
+        sa.global_callbacks = defaultdict(set)
 
 
 class TestActor(BaseTest):
@@ -45,14 +45,14 @@ class TestActor(BaseTest):
     def test_add_to_callbacks(self):
         '''Intantiating an actor add its callback to the global registry.'''
         actor = DummyActorOne()
-        expected = {'foo': [actor.foo_callback]}
+        expected = {'foo': set([actor.foo_callback])}
         self.assertEqual(expected, sa.global_callbacks)
 
     def test_double_decorated(self):
         '''It is possible to double-decorate a callback.'''
         actor = DummyActorTwo()
-        expected = {'foo': [actor.double_callback],
-                    'bar': [actor.double_callback]}
+        expected = {'foo': set([actor.double_callback]),
+                    'bar': set([actor.double_callback])}
         self.assertEqual(expected, sa.global_callbacks)
 
     def test_emit_appends(self):

@@ -10,9 +10,18 @@ from collections import deque, defaultdict
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
-global_actors = []
+global_actors = set()
 global_event_queue = deque()
-global_callbacks = defaultdict(list)
+global_callbacks = defaultdict(set)
+
+# Messages that can be emitted by Actors
+ATTACH = object()
+DETACH = object()
+REMOVE = object()
+HALT = object()
+# Messages that can be emitted by Director
+INTIATE = object()
+FINISH = object()
 
 
 def on(message):
@@ -31,22 +40,26 @@ class Actor:
     '''An actor that reacts to events.'''
 
     def __init__(self):
-        global_actors.append(self)
-        self._extract_from_decorated()
+        global_actors.add(self)
+        self._is_attached = False
+        self._attach()
 
-    def _extract_from_decorated(self):
-        '''Extract the callback message from the function objects.'''
+    def _attach(self):
+        '''Edd the actor's methods to the callback registry.'''
+        if self._is_attached:
+            return
         for _, method in inspect.getmembers(self, predicate=inspect.ismethod):
             if hasattr(method, '_callback_messages'):
                 for message in method._callback_messages:
-                    global_callbacks[message].append(method)
+                    global_callbacks[message].add(method)
+        self._is_attached = True
 
     def emit(self, message, *args, **kwargs):
         '''Emit an event.'''
         global_event_queue.append((message, self, args, kwargs))
 
 
-class Stage:
+class Director(Actor):
 
     '''Orchestrate all actors.'''
 
@@ -57,15 +70,29 @@ class Stage:
 
     def run(self):
         '''Run until there are no events to be processed.'''
+        self.emit(INTIATE)
         while global_event_queue:
             self.process_event(global_event_queue.popleft())
 
+    @on(ATTACH)
+    def attach(self, event, emitter, *args, **kwargs):
+        emitter._attach()
 
-def main():
-    Actor()
-    stage = Stage()
-    global_event_queue.append(('foo.bar.baz', 'Mr.X', (), {}))
-    stage.run()
+    @on(DETACH)
+    def detach(self, event, emitter, *args, **kwargs):
+        '''Remove the actor's methods from the callback registry.'''
+        for message, callbacks in global_callbacks.items():
+            if message is not ATTACH:
+                callbacks.discard(emitter)
 
-if __name__ == '__main__':
-    main()
+    @on(REMOVE)
+    def remove(self, event, emitter, *args, **kwargs):
+        self.detach(DETACH, emitter)
+        global_callbacks[ATTACH].remove(emitter)
+        global_actors.remove(emitter)
+
+    @on(HALT)
+    def halt(self, message, emitter, *args, **kwargs):
+        '''Halt the execution of the loop.'''
+        self.process_event((FINISH, self, (), {}))
+        exit()
