@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 '''
-Test suite for Simple Actors
+Test suite for Simple Actors.
 '''
 
 import unittest
@@ -13,8 +13,8 @@ import simpleactors as sa
 class ActorSingle(sa.Actor):
 
     @sa.on('echo')
-    def echo_callback(self, message, emitter, *args, **kwargs):
-        kwargs['ret_value'] = 'spam'
+    def echo(self, message, emitter, a_dictionary):
+        a_dictionary['emitter'] = emitter
 
 
 class ActorDouble(sa.Actor):
@@ -28,6 +28,9 @@ class ActorDouble(sa.Actor):
 class BaseTest(unittest.TestCase):
 
     '''Base class for all tests of simpleactors.'''
+
+    def setUp(self):
+        self.maxDiff = None
 
     def tearDown(self):
         sa.global_actors = set()
@@ -47,8 +50,16 @@ class TestActor(BaseTest):
         '''Intantiating an actor add its callback to the global registry.'''
         actor = ActorSingle()
         self.assertTrue(actor.is_plugged)
-        expected = {'echo': set([actor.echo_callback])}
+        expected = {'echo': set([actor.echo])}
         self.assertEqual(expected, sa.global_callbacks)
+
+    def test_plug_save_cycles(self):
+        '''Actor.plug doesn't do anything if actor.is_plugged == True.'''
+        actor = ActorSingle()
+        sa.global_callbacks = None  # Would raise if plug() would do anything
+        self.assertTrue(actor.is_plugged)
+        actor.plug()
+        self.assertEqual(None, sa.global_callbacks)
 
     def test_unplug(self):
         '''Actor.unplug will remove all callbacks from the registry.'''
@@ -57,6 +68,14 @@ class TestActor(BaseTest):
         self.assertFalse(actor.is_plugged)
         expected = {'echo': set()}
         self.assertEqual(expected, sa.global_callbacks)
+
+    def test_unplug_save_cycles(self):
+        '''Actor.unplug doesn't do anything if actor.is_plugged == False.'''
+        actor = ActorSingle()
+        actor._Actor__plugged = False
+        self.assertFalse(actor.is_plugged)
+        actor.unplug()
+        self.assertEqual({'echo': set([actor.echo])}, sa.global_callbacks)
 
     def test_emit_appends(self):
         '''Emitting an event will append it to the global deque.'''
@@ -98,6 +117,24 @@ class TestDirector(BaseTest):
         mock_cb_two.assert_called_once_with('foo', None, 1, 2, spam=42)
         self.assertFalse(mock_cb_three.called)
 
+    def test_actors(self):
+        '''Director.actors return all actors withouth the director.'''
+        first = ActorSingle()
+        second = ActorSingle()
+        third = ActorDouble()
+        director = sa.Director()
+        expected = set([first, second, third])
+        self.assertEqual(expected, director.actors)
+
+    def test_run(self):
+        '''A callback is triggered on emitting the bound signal.'''
+        actor = ActorSingle()
+        director = sa.Director()
+        a_dictionary = {}
+        actor.emit('echo', a_dictionary=a_dictionary)
+        director.run()
+        self.assertEqual({'emitter': actor}, a_dictionary)
+
     def test_run_send_initiate_event(self):
         '''Running the Dirctor emit the INITIATE signal.'''
         director = sa.Director()
@@ -105,25 +142,33 @@ class TestDirector(BaseTest):
             director.run()
             mock_emit.assert_called_once_with(sa.INITIATE)
 
+    def test_run_effect_on_registries(self):
+        '''Registries are left untouched by a simulation run.'''
+        actor = ActorSingle()
+        director = sa.Director()
+        director.run()
+        expected = {'echo': set([actor.echo]),
+                    sa.KILL: set([director.kill]),
+                    sa.HALT: set([director.halt]),
+                    sa.INITIATE: set()}
+        self.assertEqual(expected, sa.global_callbacks)
+        self.assertEqual(set([actor, director]), sa.global_actors)
+        self.assertEqual(0, len(sa.global_event_queue))
+
+    def test_kill(self):
+        '''Killing an actor removes it completely from the registries.'''
+        actor = ActorSingle()
+        director = sa.Director()
+        actor.emit(sa.KILL, target=actor)
+        director.run()
+        self.assertNotIn(actor, sa.global_actors)
+        self.assertNotIn(actor.echo, sa.global_callbacks['echo'])
+
     def test_halt(self):
         '''Halting the directory process FINISH and reset the event queue.'''
         director = sa.Director()
-        sa.global_event_queue.append('foo')
+        sa.global_event_queue.append('foo')  # If processed --> ValueError
         with mock.patch.object(director, 'process_event') as mock_process:
             director.halt(sa.HALT, self)
             self.assertEqual([], list(sa.global_event_queue))
             mock_process.assert_called_once_with((sa.FINISH, director, (), {}))
-
-
-class TestMessageHandling(BaseTest):
-
-    '''Test that messages are handled properly.'''
-
-    def test_callback_triggered(self):
-        '''A callback is triggered on emitting the bound signal'''
-        actor = ActorSingle()
-        director = sa.Director()
-        test_dict = {'ret_value': None}
-        actor.emit('echo', self, (), test_dict)
-        director.run()
-        self.assertEqual('spam', test_dict['ret_value'])

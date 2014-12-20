@@ -95,8 +95,7 @@ class Director(Actor):
         return ret
 
     @on(KILL)
-    def remove(self, event, emitter, *args, **kwargs):
-        target = args[0]
+    def kill(self, event, emitter, target, **kwargs):
         target.unplug()
         global_actors.remove(target)
 
