@@ -57,12 +57,15 @@ class Actor:
         '''Remove the actor's methods from the callback registry.'''
         if not self.__plugged:
             return
-        for callbacks in global_callbacks.values():
-            callbacks.discard(self)
+        members = set([method for _, method
+                      in inspect.getmembers(self, predicate=inspect.ismethod)])
+        for message in global_callbacks:
+            global_callbacks[message] -= members
         self.__plugged = False
 
     @property
     def is_plugged(self):
+        '''Return True if the actor is listening for messages.'''
         return self.__plugged
 
     def emit(self, message, *args, **kwargs):

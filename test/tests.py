@@ -13,7 +13,7 @@ import simpleactors as sa
 class ActorSingle(sa.Actor):
 
     @sa.on('echo')
-    def foo_callback(self, message, emitter, *args, **kwargs):
+    def echo_callback(self, message, emitter, *args, **kwargs):
         kwargs['ret_value'] = 'spam'
 
 
@@ -39,21 +39,23 @@ class TestActor(BaseTest):
 
     '''Test suite for the Actor class.'''
 
-    def test_not_instanciated(self):
+    def test_not_instantiated(self):
         '''No callback is registered if the class hasn't been instantiated.'''
         self.assertFalse(sa.global_callbacks)
 
-    def test_add_to_callbacks(self):
+    def test_instantiated(self):
         '''Intantiating an actor add its callback to the global registry.'''
         actor = ActorSingle()
-        expected = {'echo': set([actor.foo_callback])}
+        self.assertTrue(actor.is_plugged)
+        expected = {'echo': set([actor.echo_callback])}
         self.assertEqual(expected, sa.global_callbacks)
 
-    def test_double_decorated(self):
-        '''It is possible to double-decorate a callback.'''
-        actor = ActorDouble()
-        expected = {'foo': set([actor.double_callback]),
-                    'bar': set([actor.double_callback])}
+    def test_unplug(self):
+        '''Actor.unplug will remove all callbacks from the registry.'''
+        actor = ActorSingle()
+        actor.unplug()
+        self.assertFalse(actor.is_plugged)
+        expected = {'echo': set()}
         self.assertEqual(expected, sa.global_callbacks)
 
     def test_emit_appends(self):
@@ -70,10 +72,31 @@ class TestActor(BaseTest):
         expected = ('spam', self.test_emit_payload, (42, ), {'foo': 'bar'})
         self.assertTrue(expected, sa.global_event_queue[0])
 
+    def test_double_decorated(self):
+        '''It is possible for a callback to listen to more than one message.'''
+        actor = ActorDouble()
+        expected = {'foo': set([actor.double_callback]),
+                    'bar': set([actor.double_callback])}
+        self.assertEqual(expected, sa.global_callbacks)
+
 
 class TestDirector(BaseTest):
 
     '''Test suite for the Director class.'''
+
+    def test_process_event(self):
+        '''Processing an events means triggering all callbacks.'''
+        mock_cb_one = mock.MagicMock(name='one')
+        mock_cb_two = mock.MagicMock(name='two')
+        mock_cb_three = mock.MagicMock(name='three')
+        sa.global_callbacks['foo'] = set([mock_cb_one, mock_cb_two])
+        sa.global_callbacks['bar'] = set([mock_cb_three])
+        director = sa.Director()
+        event = ('foo', None, (1, 2), {'spam': 42})
+        director.process_event(event)
+        mock_cb_one.assert_called_once_with('foo', None, 1, 2, spam=42)
+        mock_cb_two.assert_called_once_with('foo', None, 1, 2, spam=42)
+        self.assertFalse(mock_cb_three.called)
 
     def test_run_send_initiate_event(self):
         '''Running the Dirctor emit the INITIATE signal.'''
