@@ -41,7 +41,7 @@ setup(
 
     # Dependencies
     extras_require={
-        'dev': ['pypandoc', 'wheel>=0.24.0'],
+        'dev': ['pypandoc', 'wheel>=0.24.0', 'twine'],
         'test': ['nose', 'rednose', 'coverage'],
     },
 )
