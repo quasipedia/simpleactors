@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 '''
-An experimental implementation of the Actor model with asyncio.
+An simple implementation of the Actor model.
 '''
 
 import logging
@@ -84,7 +84,9 @@ class Director(Actor):
 
     def run(self):
         '''Run until there are no events to be processed.'''
-        self.emit(INITIATE)
+        # We left-append rather than emit (right-append) because some message
+        # may have been already queued for execution before the director runs.
+        global_event_queue.appendleft((INITIATE, self, (), {}))
         while global_event_queue:
             self.process_event(global_event_queue.popleft())
 

@@ -138,9 +138,12 @@ class TestDirector(BaseTest):
     def test_run_send_initiate_event(self):
         '''Running the Dirctor emit the INITIATE signal.'''
         director = sa.Director()
-        with mock.patch.object(director, 'emit') as mock_emit:
+        with mock.patch.object(director, 'process_event') as mock_process:
+            director.emit('second')
             director.run()
-            mock_emit.assert_called_once_with(sa.INITIATE)
+            expected = [sa.INITIATE, 'second']
+            actual = [c[0][0][0] for c in mock_process.call_args_list]
+            self.assertEqual(expected, actual)
 
     def test_run_effect_on_registries(self):
         '''Registries are left untouched by a simulation run.'''
