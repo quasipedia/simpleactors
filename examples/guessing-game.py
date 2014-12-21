@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 '''
-An guessing number simulator.
+A guessing number simulator.
 '''
 
 from random import randint
@@ -20,7 +20,6 @@ class CodeKeeper(Actor):
     @on(INITIATE)
     def init(self, message, emitter):
         self.secret = randint(*LIMITS)
-        self.emit('code.ready')
         print('CodeKeeper is ready... [secret is {}!]'.format(self.secret))
 
     @on('attempt')
@@ -37,26 +36,24 @@ class CodeBreaker(Actor):
     @on(INITIATE)
     def init(self, message, emitter):
         self.min, self.max = LIMITS
-        print('CodeBreaker is ready...')
+        # Since messages are processed for all actors at once, we can be sure
+        # that even if the CodeBreaker gets initiated befrore the CodeKeeper
+        # the CodeKeeper will have been initialised by the time the guess will
+        # be processed.
+        self.make_attempt()
 
-    @on('code.ready')
     @on('hint')
-    # Note that make guess is the callback for two different messages, but the
-    # estimate correction only happens if the message contained an hint.
-    # (this is why `number` and `hint` defaults to None, btw...)
-    #     Also: this is not the most pythonic way, but I wanted to show the use
-    # of the double decoration.
-    def make_guess(self, message, emitter, number=None, hint=None):
+    def adjust_limits(self, message, emitter, number, hint):
         if message == 'hint':
             if hint < 0:
                 self.min = number
             elif hint > 0:
                 self.max = number
             else:
-                print('CodeBreaker celebrates in joy!')
-                return
-        # The following lines are executed regardless of what message triggered
-        # the callback.
+                return print('CodeBreaker celebrates in joy!')
+        self.make_attempt()
+
+    def make_attempt(self):
         guess = randint(self.min, self.max)
         self.emit('attempt', guess=guess)
         print('I am guessing {}'.format(guess))
