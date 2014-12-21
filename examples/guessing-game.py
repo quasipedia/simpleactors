@@ -4,6 +4,7 @@ A guessing number simulator.
 '''
 
 from random import randint
+from time import time
 
 from simpleactors import on, Actor, Director, INITIATE
 
@@ -23,12 +24,14 @@ class CodeKeeper(Actor):
         print('CodeKeeper is ready... [secret is {}!]'.format(self.secret))
 
     @on('attempt')
-    def give_hint(self, message, emitter, guess):
+    def give_hint(self, message, emitter, attempt):
         # The following construct is the equivalent of the python2 `cmp`
         # function, as cmp(a, b) == (a > b) - (a < b)
-        hint = (guess > self.secret) - (guess < self.secret)
-        self.emit('hint', number=guess, hint=hint)
-        print('your guess was {}'.format(HUMAN_CMP[hint]))
+        hint = (attempt > self.secret) - (attempt < self.secret)
+        self.emit('hint', number=attempt, hint=hint)
+        print('your attempt was {}'.format(HUMAN_CMP[hint]))
+        if hint == 0:
+            self.emit('game.over')
 
 
 class CodeBreaker(Actor):
@@ -50,14 +53,33 @@ class CodeBreaker(Actor):
             elif hint > 0:
                 self.max = number
             else:
-                return print('CodeBreaker celebrates in joy!')
+                return  # Won't make an attempt if it guessed correctly
         self.make_attempt()
 
     def make_attempt(self):
-        guess = randint(self.min, self.max)
-        self.emit('attempt', guess=guess)
-        print('I am guessing {}'.format(guess))
+        attempt = randint(self.min, self.max)
+        self.emit('attempt', attempt=attempt)
+        print('I am guessing {}'.format(attempt))
 
+
+class Referee(Actor):
+
+    @on(INITIATE)
+    def init(self, message, emitter):
+        self.start_time = time()
+        self.msg_count = 0
+
+    @on('attempt')
+    @on('hint')
+    # See? You can stack multiple decorators for the same callback! :)
+    def count(self, message, emitter, *args, **kwargs):
+        self.msg_count += 1
+
+    @on('game.over')
+    def stats(self, message, emitter):
+        elapsed_time = time() - self.start_time
+        msg = 'REFEREE: The game took {} messages and {:.3} ms to complete'
+        print(msg.format(self.msg_count, elapsed_time * 1000))
 
 if __name__ == '__main__':
     # Since a reference to all instantiated Actors is kept in the simpleactors
@@ -65,5 +87,5 @@ if __name__ == '__main__':
     #     Not having a reference in the main code is even better if the `KILL`
     # message is given somewhere, as this will instantly cause the killed actor
     # to be garbage collected.
-    CodeKeeper(), CodeBreaker()
+    CodeKeeper(), CodeBreaker(), Referee()
     Director().run()
