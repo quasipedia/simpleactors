@@ -5,7 +5,6 @@ Test suite for Simple Actors.
 
 import unittest
 from unittest import mock
-from collections import deque, defaultdict
 
 import simpleactors as sa
 
@@ -29,13 +28,8 @@ class BaseTest(unittest.TestCase):
 
     '''Base class for all tests of simpleactors.'''
 
-    def setUp(self):
-        self.maxDiff = None
-
     def tearDown(self):
-        sa.global_actors = set()
-        sa.global_event_queue = deque()
-        sa.global_callbacks = defaultdict(set)
+        sa.reset()
 
 
 class TestActor(BaseTest):
@@ -47,19 +41,26 @@ class TestActor(BaseTest):
         self.assertFalse(sa.global_callbacks)
 
     def test_instantiated(self):
-        '''Intantiating an actor add its callback to the global registry.'''
+        '''Instantiating an actor add its callback to the global registry.'''
         actor = ActorSingle()
         self.assertTrue(actor.is_plugged)
         expected = {'echo': set([actor.echo])}
         self.assertEqual(expected, sa.global_callbacks)
 
+    def test_instantiated_no_autoplug(self):
+        '''Instantiating an actor with auto_plug set to False prevent plug.'''
+        actor = ActorSingle(auto_plug=False)
+        self.assertFalse(actor.is_plugged)
+        expected = {}
+        self.assertEqual(expected, sa.global_callbacks)
+
     def test_plug_save_cycles(self):
         '''Actor.plug doesn't do anything if actor.is_plugged == True.'''
         actor = ActorSingle()
-        sa.global_callbacks = None  # Would raise if plug() would do anything
+        saved = sa.global_callbacks.copy()
         self.assertTrue(actor.is_plugged)
         actor.plug()
-        self.assertEqual(None, sa.global_callbacks)
+        self.assertEqual(saved, sa.global_callbacks)
 
     def test_unplug(self):
         '''Actor.unplug will remove all callbacks from the registry.'''

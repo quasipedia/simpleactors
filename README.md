@@ -1,4 +1,10 @@
 Simple Actors
 =============
 
-An extremely simple implementation of the Actor model
+A simple implementation of the Actor model
+
+
+ToDo
+----
+
+- Documentation

@@ -14,7 +14,7 @@ setup(
     name='simpleactors',
     version=open(path.join(here, 'VERSION')).read().strip(),
     license='GPLv3+',
-    description='An extremely simple implementation of the Actor model',
+    description='A simple implementation of the Actor model',
     long_description=long_description,
     url='https://github.com/quasipedia/simpleactors',
 

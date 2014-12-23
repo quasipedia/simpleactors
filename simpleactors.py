@@ -23,6 +23,13 @@ INITIATE = object()  # First action when the loop starts
 FINISH = object()  # Las action before the loop ends
 
 
+def reset():
+    '''Reset simpleactors global registries.'''
+    global_actors.clear()
+    global_event_queue.clear()
+    global_callbacks.clear()
+
+
 def on(message):
     '''Decorator that register a class method as callback for a message.'''
     def decorator(function):
@@ -36,12 +43,18 @@ def on(message):
 
 class Actor:
 
-    '''An actor that reacts to events.'''
+    '''An actor that reacts to events.
 
-    def __init__(self):
+    Args:
+        auto_plug - if True (default) the actor will automatically plug itself
+                    into the mail event loop.
+    '''
+
+    def __init__(self, auto_plug=True):
         global_actors.add(self)
         self.__plugged = False
-        self.plug()
+        if auto_plug:
+            self.plug()
 
     def plug(self):
         '''Add the actor's methods to the callback registry.'''
