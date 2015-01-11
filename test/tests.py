@@ -32,6 +32,33 @@ class BaseTest(unittest.TestCase):
         sa.reset()
 
 
+class TestModuleFunctions(BaseTest):
+
+    '''Tests for the module-level functions.'''
+
+    def test_reset(self):
+        '''reset() clear all registries.'''
+        ActorSingle()
+        self.assertTrue(len(sa.global_actors))
+        self.assertTrue(len(sa.global_actors_by_id))
+        self.assertTrue(len(sa.global_callbacks))
+        sa.reset()
+        self.assertFalse(len(sa.global_actors))
+        self.assertFalse(len(sa.global_actors_by_id))
+        self.assertFalse(len(sa.global_callbacks))
+
+    def test_get_by_id_ok(self):
+        '''get_by_id() return an object with a given ID by a given class.'''
+        actor = sa.Actor(uid='spam')
+        actual = sa.get_by_id(sa.Actor, 'spam')
+        self.assertEqual(actor, actual)
+
+    def test_get_by_id_ko(self):
+        '''get_by_id() return None on "not found" results.'''
+        actual = sa.get_by_id(sa.Actor, 'spam')
+        self.assertEqual(None, actual)
+
+
 class TestActor(BaseTest):
 
     '''Test suite for the Actor class.'''
@@ -46,6 +73,11 @@ class TestActor(BaseTest):
         self.assertTrue(actor.is_plugged)
         expected = {'echo': set([actor.echo])}
         self.assertEqual(expected, sa.global_callbacks)
+
+    def test_double_uid(self):
+        '''Instantiating an actor with existing uid raises.'''
+        sa.Actor(uid='foo')
+        self.assertRaises(ValueError, sa.Actor, uid='foo')
 
     def test_instantiated_no_autoplug(self):
         '''Instantiating an actor with auto_plug set to False prevent plug.'''

@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 global_actors = set()
+global_actors_by_id = defaultdict(dict)
 global_event_queue = deque()
 global_callbacks = defaultdict(set)
 
@@ -26,8 +27,14 @@ FINISH = object()  # Las action before the loop ends
 def reset():
     '''Reset simpleactors global registries.'''
     global_actors.clear()
+    global_actors_by_id.clear()
     global_event_queue.clear()
     global_callbacks.clear()
+
+
+def get_by_id(class_, uid):
+    '''Return an object by it's id'''
+    return global_actors_by_id[class_].get(uid, None)
 
 
 def on(message):
@@ -50,8 +57,13 @@ class Actor:
                     into the mail event loop.
     '''
 
-    def __init__(self, auto_plug=True):
+    def __init__(self, uid=None, auto_plug=True):
+        self.id = id(self) if uid is None else uid
         global_actors.add(self)
+        if self.id in global_actors_by_id[self.__class__]:
+            msg = 'A "{}" instance with id "{}" has been already created.'
+            raise ValueError(msg.format(self.__class__, self.id))
+        global_actors_by_id[self.__class__][self.id] = self
         self.__plugged = False
         if auto_plug:
             self.plug()
