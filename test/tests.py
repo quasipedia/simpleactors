@@ -12,7 +12,7 @@ import simpleactors as sa
 class ActorSingle(sa.Actor):
 
     @sa.on('echo')
-    def echo(self, message, emitter, a_dictionary):
+    def echo_callback(self, message, emitter, a_dictionary):
         a_dictionary['emitter'] = emitter
 
 
@@ -22,6 +22,15 @@ class ActorDouble(sa.Actor):
     @sa.on('bar')
     def double_callback(self, message, emitter, *args, **kwargs):
         pass
+
+
+class ActorAny(sa.Actor):
+
+    messages = []
+
+    @sa.on(sa.ANY)
+    def any_callback(self, message, emitter, *args, **kwargs):
+        self.messages.append(message)
 
 
 class BaseTest(unittest.TestCase):
@@ -71,7 +80,7 @@ class TestActor(BaseTest):
         '''Instantiating an actor add its callback to the global registry.'''
         actor = ActorSingle()
         self.assertTrue(actor.is_plugged)
-        expected = {'echo': set([actor.echo])}
+        expected = {'echo': set([actor.echo_callback])}
         self.assertEqual(expected, sa.global_callbacks)
 
     def test_double_uid(self):
@@ -108,7 +117,8 @@ class TestActor(BaseTest):
         actor._Actor__plugged = False
         self.assertFalse(actor.is_plugged)
         actor.unplug()
-        self.assertEqual({'echo': set([actor.echo])}, sa.global_callbacks)
+        self.assertEqual({'echo': set([actor.echo_callback])},
+                         sa.global_callbacks)
 
     def test_emit_appends(self):
         '''Emitting an event will append it to the global deque.'''
@@ -168,6 +178,14 @@ class TestDirector(BaseTest):
         director.run()
         self.assertEqual({'emitter': actor}, a_dictionary)
 
+    def test_any(self):
+        '''A callback bound to sa.ANY is triggered by any signal.'''
+        actor = ActorAny()
+        director = sa.Director()
+        actor.emit('foobar')
+        director.run()
+        self.assertEqual([sa.INITIATE, 'foobar'], actor.messages)
+
     def test_run_send_initiate_event(self):
         '''Running the Dirctor emit the INITIATE signal.'''
         director = sa.Director()
@@ -183,10 +201,11 @@ class TestDirector(BaseTest):
         actor = ActorSingle()
         director = sa.Director()
         director.run()
-        expected = {'echo': set([actor.echo]),
+        expected = {'echo': set([actor.echo_callback]),
                     sa.KILL: set([director.kill]),
                     sa.HALT: set([director.halt]),
-                    sa.INITIATE: set()}
+                    sa.INITIATE: set(),
+                    sa.ANY: set()}
         self.assertEqual(expected, sa.global_callbacks)
         self.assertEqual(set([actor, director]), sa.global_actors)
         self.assertEqual(0, len(sa.global_event_queue))
@@ -198,7 +217,7 @@ class TestDirector(BaseTest):
         actor.emit(sa.KILL, target=actor)
         director.run()
         self.assertNotIn(actor, sa.global_actors)
-        self.assertNotIn(actor.echo, sa.global_callbacks['echo'])
+        self.assertNotIn(actor.echo_callback, sa.global_callbacks['echo'])
 
     def test_halt(self):
         '''Halting the directory process FINISH and reset the event queue.'''

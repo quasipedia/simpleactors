@@ -17,11 +17,14 @@ global_callbacks = defaultdict(set)
 
 # Messages that can be emitted by Actors
 KILL = object()  # Kill an actor
-HALT = object()  # Hald the main loop
+HALT = object()  # Halt the main loop
 
 # Messages that can be emitted by Director
 INITIATE = object()  # First action when the loop starts
 FINISH = object()  # Las action before the loop ends
+
+# Special on values
+ANY = object()  # @on(ANY) trigger for any message
 
 
 def reset():
@@ -105,6 +108,8 @@ class Director(Actor):
     def process_event(self, event):
         message, emitter, args, kwargs = event
         for callback in global_callbacks[message]:
+            callback(message, emitter, *args, **kwargs)
+        for callback in global_callbacks[ANY]:
             callback(message, emitter, *args, **kwargs)
 
     def run(self):
